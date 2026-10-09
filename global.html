@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Global</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .recording-pulse { animation: pulse-slow 1.5s infinite; }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-center items-center overflow-hidden m-0 p-0">
+
+  <!-- 1. TELA DE LOGIN / PERFIL -->
+  <div id="setupScreen" class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md flex flex-col items-center text-center">
+    <h1 class="text-base font-medium text-white mb-1">Chat Global</h1>
+    <p class="text-xs text-slate-400 mb-5">Escolha o seu apelido e uma foto.</p>
+
+    <div class="relative mb-5 cursor-pointer group">
+      <div id="avatarPreview" class="w-16 h-16 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 overflow-hidden">
+        <i class="fa-regular fa-user text-base"></i>
+      </div>
+      <input type="file" id="inputAvatarFile" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+    </div>
+
+    <div class="w-full space-y-3 text-left">
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Apelido</label>
+        <input type="text" id="inputNick" placeholder="Seu nome" class="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:outline-none focus:border-slate-500">
+      </div>
+      
+      <p id="setupError" class="text-[11px] text-rose-400 hidden"></p>
+
+      <button type="button" id="btnEnterChat" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium text-xs transition border border-slate-700">
+        Entrar
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. TELA DO CHAT GLOBAL -->
+  <div id="chatScreen" class="hidden w-full h-full md:h-[90vh] md:max-w-3xl bg-slate-900 rounded-none md:rounded-xl shadow-md flex flex-col overflow-hidden border border-slate-800">
+    
+    <!-- Cabeçalho -->
+    <div class="h-14 bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 text-white flex items-center justify-center text-xs">
+          <i class="fa-solid fa-globe"></i>
+        </div>
+        <div>
+          <h2 class="font-medium text-xs text-white">Chat Global</h2>
+          <p class="text-[10px] text-emerald-400">Conectado</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-3">
+        <div id="headerUserInfo" class="flex items-center space-x-2 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
+          <!-- Preenchido via JS -->
+        </div>
+        <button id="btnLogout" class="text-slate-400 hover:text-rose-400 text-xs p-1.5 transition" title="Sair / Trocar perfil">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Lista de Mensagens -->
+    <div id="messagesList" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-950/40">
+      <div class="text-center text-slate-500 text-xs py-8">A carregar mensagens...</div>
+    </div>
+
+    <!-- Caixa de Resposta Ativa -->
+    <div id="replyPreviewContainer" class="hidden px-4 py-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300 shrink-0">
+      <div class="flex items-center space-x-2 truncate">
+        <i class="fa-solid fa-reply text-slate-400"></i>
+        <span class="text-slate-400">Respondendo a <strong id="replyingToName" class="text-white"></strong>:</span>
+        <span id="replyingToText" class="truncate text-slate-400 italic"></span>
+      </div>
+      <button onclick="cancelReply()" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Barra de Envio -->
+    <div class="p-3 bg-slate-900 border-t border-slate-800 shrink-0">
+      <div class="bg-slate-950 rounded-lg px-3 py-2 flex items-center space-x-2.5 border border-slate-800 focus-within:border-slate-600 transition">
+        
+        <!-- Enviar Imagem -->
+        <label class="text-slate-400 hover:text-white cursor-pointer transition text-xs" title="Enviar Imagem">
+          <i class="fa-regular fa-image"></i>
+          <input type="file" id="inputMessageImage" accept="image/*" class="hidden">
+        </label>
+
+        <!-- Gravar Áudio -->
+        <button type="button" id="btnRecordAudio" class="text-slate-400 hover:text-white transition text-xs" title="Gravar Áudio">
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+        
+        <input type="text" id="messageInput" placeholder="Escreva uma mensagem..." autocomplete="off" class="flex-1 bg-transparent text-slate-100 text-xs focus:outline-none placeholder-slate-500">
+        
+        <button type="button" id="btnSendMessage" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA E FIREBASE -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp, doc, getDoc, updateDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBUgppRiCO_zIpOKhQnTSB51sbdq1pnVg0",
+      authDomain: "dc-2-fbd24.firebaseapp.com",
+      projectId: "dc-2-fbd24",
+      storageBucket: "dc-2-fbd24.firebasestorage.app",
+      messagingSenderId: "287762660528",
+      appId: "1:287762660528:web:124f4bc9d83cc5ed3d0f75"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const OWNER_NICK = "cosmico.jpg";
+
+    let userNick = localStorage.getItem("pulse_chat_nick") || "";
+    let userAvatarBase64 = localStorage.getItem("pulse_chat_avatar") || "";
+    let replyingTo = null;
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    if (userNick) {
+      initChatSession();
+    }
+
+    if (userAvatarBase64) {
+      document.getElementById('avatarPreview').innerHTML = `<img src="${userAvatarBase64}" class="w-full h-full object-cover">`;
+    }
+
+    document.getElementById('inputAvatarFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        userAvatarBase64 = evt.target.result;
+        document.getElementById('avatarPreview').innerHTML = `<img src="${userAvatarBase64}" class="w-full h-full object-cover">`;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btnEnterChat').addEventListener('click', async () => {
+      const nick = document.getElementById('inputNick').value.trim();
+      const errorEl = document.getElementById('setupError');
+      errorEl.classList.add('hidden');
+
+      if (!nick) {
+        errorEl.innerText = "Por favor, insira um apelido.";
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      if (nick.toLowerCase() === OWNER_NICK.toLowerCase()) {
+        proceedLogin(OWNER_NICK);
+        return;
+      }
+
+      try {
+        const snap = await getDocs(collection(db, "global_chat_messages"));
+        let exists = false;
+        snap.forEach(d => {
+          const data = d.data();
+          if (data.nick && data.nick.toLowerCase() === nick.toLowerCase()) {
+            exists = true;
+          }
+        });
+
+        if (exists) {
+          errorEl.innerText = "Já existe um nick desse.";
+          errorEl.classList.remove('hidden');
+          return;
+        }
+      } catch(e) {
+        console.error("Erro ao verificar nick:", e);
+      }
+
+      proceedLogin(nick);
+    });
+
+    function proceedLogin(nick) {
+      userNick = nick;
+      localStorage.setItem("pulse_chat_nick", userNick);
+      localStorage.setItem("pulse_chat_avatar", userAvatarBase64);
+      initChatSession();
+    }
+
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      localStorage.removeItem("pulse_chat_nick");
+      localStorage.removeItem("pulse_chat_avatar");
+      location.reload();
+    });
+
+    function initChatSession() {
+      document.getElementById('setupScreen').classList.add('hidden');
+      document.getElementById('chatScreen').classList.remove('hidden');
+
+      const headerInfo = document.getElementById('headerUserInfo');
+      const avatarHtml = userAvatarBase64 
+        ? `<img src="${userAvatarBase64}" class="w-5 h-5 rounded object-cover">` 
+        : `<div class="w-5 h-5 rounded bg-slate-800 text-white font-medium flex items-center justify-center text-[10px]">${userNick.charAt(0)}</div>`;
+      
+      const ownerBadge = userNick.toLowerCase() === OWNER_NICK.toLowerCase() ? `<span class="bg-amber-500/15 text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1 rounded ml-1">DONO</span>` : '';
+      
+      headerInfo.innerHTML = `${avatarHtml} <span class="font-medium text-white">${userNick}</span> ${ownerBadge}`;
+
+      loadGlobalMessages();
+    }
+
+    document.getElementById('btnSendMessage').addEventListener('click', () => submitMessage(""));
+    document.getElementById('messageInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitMessage("");
+      }
+    });
+
+    document.getElementById('inputMessageImage').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        submitMessage("", evt.target.result, "");
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btnRecordAudio').addEventListener('click', async () => {
+      const micBtn = document.getElementById('btnRecordAudio');
+      
+      if (!isRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = event => {
+            if (event.data.size > 0) audioChunks.push(event.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = async function() {
+              const base64Audio = reader.result;
+              await submitMessage("", "", base64Audio);
+            };
+            stream.getTracks().forEach(track => track.stop());
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          micBtn.classList.add('text-rose-400', 'recording-pulse');
+        } catch (err) {
+          alert("Não foi possível aceder ao microfone.");
+          console.error(err);
+        }
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        micBtn.classList.remove('text-rose-400', 'recording-pulse');
+      }
+    });
+
+    async function submitMessage(forcedText = "", imageContent = "", audioContent = "") {
+      const input = document.getElementById('messageInput');
+      const text = forcedText || input.value.trim();
+      
+      if (!text && !imageContent && !audioContent) return;
+
+      if (!forcedText && !imageContent && !audioContent) input.value = '';
+
+      if (text === '/apagartudo') {
+        if (userNick.toLowerCase() === OWNER_NICK.toLowerCase()) {
+          await clearAllMessages();
+        } else {
+          alert("Comando não autorizado.");
+        }
+        if (!forcedText) input.value = '';
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "global_chat_messages"), {
+          nick: userNick,
+          avatar: userAvatarBase64,
+          text: text,
+          image: imageContent || "",
+          audio: audioContent || "",
+          replyTo: replyingTo ? { nick: replyingTo.nick, text: replyingTo.text || (replyingTo.audio ? "[Áudio]" : "[Imagem]") } : null,
+          reactions: {},
+          createdAt: serverTimestamp()
+        });
+        cancelReply();
+      } catch (err) {
+        console.error("Erro ao enviar:", err);
+      }
+    }
+
+    async function clearAllMessages() {
+      try {
+        const snap = await getDocs(collection(db, "global_chat_messages"));
+        const deletes = snap.docs.map(d => deleteDoc(doc(db, "global_chat_messages", d.id)));
+        await Promise.all(deletes);
+      } catch(e) {
+        console.error("Erro ao limpar mensagens", e);
+      }
+    }
+
+    window.deleteMessage = async (msgId) => {
+      if (userNick.toLowerCase() !== OWNER_NICK.toLowerCase()) return;
+      try {
+        await deleteDoc(doc(db, "global_chat_messages", msgId));
+      } catch(e) {
+        console.error("Erro ao apagar mensagem", e);
+      }
+    };
+
+    window.setReplyTo = (id, nick, text) => {
+      replyingTo = { id, nick, text };
+      document.getElementById('replyingToName').innerText = nick;
+      document.getElementById('replyingToText').innerText = text || "Mídia";
+      document.getElementById('replyPreviewContainer').classList.remove('hidden');
+      document.getElementById('messageInput').focus();
+    };
+
+    window.cancelReply = () => {
+      replyingTo = null;
+      document.getElementById('replyPreviewContainer').classList.add('hidden');
+    };
+
+    window.addReaction = async (msgId, emoji) => {
+      const msgRef = doc(db, "global_chat_messages", msgId);
+      const msgSnap = await getDoc(msgRef);
+      if (!msgSnap.exists()) return;
+
+      let reactions = msgSnap.data().reactions || {};
+      if (!reactions[emoji]) reactions[emoji] = [];
+
+      const index = reactions[emoji].indexOf(userNick);
+      if (index > -1) {
+        reactions[emoji].splice(index, 1);
+        if (reactions[emoji].length === 0) delete reactions[emoji];
+      } else {
+        reactions[emoji].push(userNick);
+      }
+
+      await updateDoc(msgRef, { reactions });
+    };
+
+    function loadGlobalMessages() {
+      const messagesList = document.getElementById('messagesList');
+      const q = query(collection(db, "global_chat_messages"), orderBy("createdAt", "asc"), limit(100));
+
+      onSnapshot(q, (snapshot) => {
+        messagesList.innerHTML = '';
+        if (snapshot.empty) {
+          messagesList.innerHTML = '<div class="text-center text-slate-500 text-xs py-8">Nenhuma mensagem ainda.</div>';
+          return;
+        }
+
+        snapshot.forEach((docSnap) => {
+          const msgId = docSnap.id;
+          const msg = docSnap.data();
+          const isOwner = msg.nick && msg.nick.toLowerCase() === OWNER_NICK.toLowerCase();
+          const amIOwner = userNick.toLowerCase() === OWNER_NICK.toLowerCase();
+
+          const avatarHtml = msg.avatar 
+            ? `<img src="${msg.avatar}" class="w-6 h-6 rounded-lg object-cover shrink-0">` 
+            : `<div class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 text-white font-medium flex items-center justify-center text-[10px] shrink-0">${msg.nick ? msg.nick.charAt(0).toUpperCase() : 'U'}</div>`;
+
+          let replyHtml = '';
+          if (msg.replyTo) {
+            replyHtml = `
+              <div class="mb-1 px-2 py-0.5 bg-slate-900 border-l border-slate-600 rounded text-[10px] text-slate-400">
+                <strong class="text-slate-300">${escapeHtml(msg.replyTo.nick)}</strong>: ${escapeHtml(msg.replyTo.text || "Mídia")}
+              </div>
+            `;
+          }
+
+          let contentHtml = "";
+          if (msg.text) {
+            contentHtml += `<div class="mb-1">${escapeHtml(msg.text)}</div>`;
+          }
+          if (msg.image) {
+            contentHtml += `<div class="mt-1"><img src="${msg.image}" class="max-w-xs rounded-lg border border-slate-700"></div>`;
+          }
+          if (msg.audio) {
+            contentHtml += `<div class="mt-1"><audio controls preload="auto" src="${msg.audio}" class="w-full min-w-[220px] h-9"></audio></div>`;
+          }
+
+          let reactionsHtml = '';
+          if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+            reactionsHtml = `<div class="flex flex-wrap gap-1 mt-1">`;
+            for (const [emoji, users] of Object.entries(msg.reactions)) {
+              const hasReacted = users.includes(userNick);
+              reactionsHtml += `
+                <button onclick="addReaction('${msgId}', '${emoji}')" class="px-1.5 py-0.5 rounded text-[10px] flex items-center space-x-1 border ${hasReacted ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-slate-900 border-slate-800 text-slate-400'}">
+                  <span>${emoji}</span>
+                  <span>${users.length}</span>
+                </button>
+              `;
+            }
+            reactionsHtml += `</div>`;
+          }
+
+          const deleteBtnHtml = amIOwner ? `<button onclick="deleteMessage('${msgId}')" class="text-rose-400 hover:text-rose-300 px-1" title="Apagar mensagem"><i class="fa-solid fa-trash"></i></button>` : '';
+
+          const msgEl = document.createElement('div');
+          msgEl.className = `flex items-start space-x-2.5 mb-3 group relative`;
+          msgEl.innerHTML = `
+            ${avatarHtml}
+            <div class="flex-1">
+              <div class="flex items-center space-x-2 mb-0.5">
+                <span class="text-xs font-medium text-white">${escapeHtml(msg.nick)}</span>
+                ${isOwner ? '<span class="bg-amber-500/15 text-amber-400 border border-amber-500/20 text-[9px] font-bold px-1 rounded">DONO</span>' : ''}
+                <span class="text-[9px] text-slate-500">${msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
+              </div>
+              <div class="inline-block max-w-[85%] rounded-lg px-3 py-2 text-xs bg-slate-800/90 text-slate-100 border border-slate-700/50">
+                ${replyHtml}
+                ${contentHtml}
+              </div>
+              ${reactionsHtml}
+            </div>
+            <div class="hidden group-hover:flex items-center space-x-1 absolute right-2 top-0 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-xs shadow-sm">
+              ${deleteBtnHtml}
+              <button onclick="setReplyTo('${msgId}', '${escapeHtml(msg.nick)}', '${escapeHtml(msg.text || (msg.audio ? '[Áudio]' : '[Imagem]'))}')" class="text-slate-400 hover:text-white px-1" title="Responder"><i class="fa-solid fa-reply"></i></button>
+              <button onclick="addReaction('${msgId}', '👍')" class="hover:scale-110 transition px-1">👍</button>
+              <button onclick="addReaction('${msgId}', '❤️')" class="hover:scale-110 transition px-1">❤️</button>
+              <button onclick="addReaction('${msgId}', '🔥')" class="hover:scale-110 transition px-1">🔥</button>
+            </div>
+          `;
+          messagesList.appendChild(msgEl);
+        });
+
+        messagesList.scrollTop = messagesList.scrollHeight;
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
+
